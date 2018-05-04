@@ -26,8 +26,8 @@
 		
 		public object renderObj = null;
 		
-		public Mailbox baseMailbox = null;
-		public Mailbox cellMailbox = null;
+		public EntityCall baseEntityCall = null;
+		public EntityCall cellEntityCall = null;
 		
 		// enterworld之后设置为true
 		public bool inWorld = false;
@@ -172,8 +172,15 @@
 				return;
 			}
 
+			ScriptModule module = null;
+			if(!EntityDef.moduledefs.TryGetValue(className, out module))
+			{
+				Dbg.ERROR_MSG("entity::baseCall:  entity-module(" + className + ") error, can not find from EntityDef.moduledefs");
+				return;
+			}
+				
 			Method method = null;
-			if(!EntityDef.moduledefs[className].base_methods.TryGetValue(methodname, out method))
+			if(!module.base_methods.TryGetValue(methodname, out method))
 			{
 				Dbg.ERROR_MSG(className + "::baseCall(" + methodname + "), not found method!");  
 				return;
@@ -187,8 +194,8 @@
 				return;
 			}
 			
-			baseMailbox.newMail();
-			baseMailbox.bundle.writeUint16(methodID);
+			baseEntityCall.newCall();
+			baseEntityCall.bundle.writeUint16(methodID);
 			
 			try
 			{
@@ -196,7 +203,7 @@
 				{
 					if(method.args[i].isSameType(arguments[i]))
 					{
-						method.args[i].addToStream(baseMailbox.bundle, arguments[i]);
+						method.args[i].addToStream(baseEntityCall.bundle, arguments[i]);
 					}
 					else
 					{
@@ -207,11 +214,11 @@
 			catch(Exception e)
 			{
 				Dbg.ERROR_MSG(className + "::baseCall(method=" + methodname + "): args is error(" + e.Message + ")!");  
-				baseMailbox.bundle = null;
+				baseEntityCall.bundle = null;
 				return;
 			}
 			
-			baseMailbox.postMail(null);
+			baseEntityCall.sendCall(null);
 		}
 		
 		public void cellCall(string methodname, params object[] arguments)
@@ -222,8 +229,15 @@
 				return;
 			}
 			
+			ScriptModule module = null;
+			if(!EntityDef.moduledefs.TryGetValue(className, out module))
+			{
+				Dbg.ERROR_MSG("entity::cellCall:  entity-module(" + className + ") error, can not find from EntityDef.moduledefs!");
+				return;
+			}
+			
 			Method method = null;
-			if(!EntityDef.moduledefs[className].cell_methods.TryGetValue(methodname, out method))
+			if(!module.cell_methods.TryGetValue(methodname, out method))
 			{
 				Dbg.ERROR_MSG(className + "::cellCall(" + methodname + "), not found method!");  
 				return;
@@ -237,14 +251,14 @@
 				return;
 			}
 			
-			if(cellMailbox == null)
+			if(cellEntityCall == null)
 			{
 				Dbg.ERROR_MSG(className + "::cellCall(" + methodname + "): no cell!");  
 				return;
 			}
 			
-			cellMailbox.newMail();
-			cellMailbox.bundle.writeUint16(methodID);
+			cellEntityCall.newCall();
+			cellEntityCall.bundle.writeUint16(methodID);
 				
 			try
 			{
@@ -252,7 +266,7 @@
 				{
 					if(method.args[i].isSameType(arguments[i]))
 					{
-						method.args[i].addToStream(cellMailbox.bundle, arguments[i]);
+						method.args[i].addToStream(cellEntityCall.bundle, arguments[i]);
 					}
 					else
 					{
@@ -263,11 +277,11 @@
 			catch(Exception e)
 			{
 				Dbg.ERROR_MSG(className + "::cellCall(" + methodname + "): args is error(" + e.Message + ")!");  
-				cellMailbox.bundle = null;
+				cellEntityCall.bundle = null;
 				return;
 			}
 
-			cellMailbox.postMail(null);
+			cellEntityCall.sendCall(null);
 		}
 	
 		public void enterWorld()
@@ -324,6 +338,10 @@
 			}
 			
 			Event.fireOut("onEnterSpace", new object[]{this});
+			
+			// 要立即刷新表现层对象的位置
+			Event.fireOut("set_position", new object[]{this});
+			Event.fireOut("set_direction", new object[]{this});
 		}
 		
 		public virtual void onEnterSpace()
